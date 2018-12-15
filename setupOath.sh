@@ -11,6 +11,8 @@ type="HOTP"
 window="30"
 pinLen="6"
 cnf="/etc/users.oath"
+sshdConfig="/etc/ssh/sshd_config"
+sshdPam="/etc/pam.d/sshd"
 typeLower=$(echo $type | tr '[:upper:]' '[:lower:]')
 
 
@@ -25,41 +27,41 @@ setSeed(){
 
 setSshdConfig(){
     local now=$(date +%Y-%m-%d-%H-%M-%s)
-    read -p $'\e[33mReconfigure /etc/ssh/sshd_config [Y/N]?\e[0m' -n 1 -r REPLY
+    read -p $'\e[33mReconfigure $sshdConfig [Y/N]?\e[0m' -n 1 -r REPLY
     echo
     echo "[$REPLY]"
     if [[  $REPLY =~ ^[Yy]$ ]]
     then
-        cp --verbose /etc/ssh/sshd_config /etc/ssh/sshd_config.$now.bak
-        sed -i "s/^UsePAM\ .*/UsePAM\ yes/g" /etc/ssh/sshd_config
-        sed -i "s/^ChallengeResponseAuthentication\ .*/ChallengeResponseAuthentication\ yes/g" /etc/ssh/sshd_config
+        cp --verbose $sshdConfig $sshdConfig.$now.bak
+        sed -i "s/^UsePAM\ .*/UsePAM\ yes/g" $sshdConfig
+        sed -i "s/^ChallengeResponseAuthentication\ .*/ChallengeResponseAuthentication\ yes/g" $sshdConfig
         echo -e "\e[32m"
-        cat /etc/ssh/sshd_config | grep 'UsePAM\|ChallengeResponseAuthentication'
+        cat $sshdConfig | grep 'UsePAM\|ChallengeResponseAuthentication'
         echo -e "\e[0m"
         service sshd restart
     fi
 }
 
 setSshdAuth(){
-    pamExists=$(cat /etc/pam.d/sshd | grep "pam_oath.so" | wc -l)
+    pamExists=$(cat $sshdPam | grep "pam_oath.so" | wc -l)
     local now=$(date +%Y-%m-%d-%H-%M-%s)
-    cp --verbose /etc/pam.d/sshd /etc/pam.d/sshd.$now.bak
+    cp --verbose $sshdPam $sshdPam.$now.bak
     if [ "$pamExists" -gt "0" ]
     then
         local cnfEscaped=$(echo $cnf | sed 's/\//\\\//g' )
-        echo -e "\e[31mpam_oath found in /etc/pam.d/sshd\n Replacing\e[0m"
-        sed -i "s/.*pam_oath.*/auth\ $authType\ pam_oath\.so\ usersfile\=$cnfEscaped\ window\=$window\ digits\=$pinLen/g"  /etc/pam.d/sshd
+        echo -e "\e[31mpam_oath found in $sshdPam\n Replacing\e[0m"
+        sed -i "s/.*pam_oath.*/auth\ $authType\ pam_oath\.so\ usersfile\=$cnfEscaped\ window\=$window\ digits\=$pinLen/g"  $sshdPam
     else
-        read -p $'\e[33mAdd pam_oath to /etc/pam.d/sshd [Y/N]?\e[0m' -n 1 -r REPLY
+        read -p $'\e[33mAdd pam_oath to $sshdPam [Y/N]?\e[0m' -n 1 -r REPLY
         echo
         echo "[$REPLY]"
         if [[  $REPLY =~ ^[Yy]$ ]]
         then
-#            echo -e "auth $authType pam_oath.so usersfile=$cnf\n\n$(cat /etc/pam.d/sshd)" > /etc/pam.d/sshd
-            echo -e "auth $authType pam_oath.so usersfile=$cnf window=$window digits=$pinLen\n\n$(cat /etc/pam.d/sshd)" > /etc/pam.d/sshd
+#            echo -e "auth $authType pam_oath.so usersfile=$cnf\n\n$(cat $sshdPam)" > $sshdPam
+            echo -e "auth $authType pam_oath.so usersfile=$cnf window=$window digits=$pinLen\n\n$(cat $sshdPam)" > $sshdPam
         fi
     fi
-    echo -e '------------- /etc/pam.d/sshd (3) ------------------\e[32m' && cat /etc/pam.d/sshd | grep pam_oath && echo -e '\e[0m-----------------------------------------------'
+    echo -e "------------- $sshdPam (3) ------------------\e[32m" && cat $sshdPam | grep pam_oath && echo -e '\e[0m-----------------------------------------------'
 }
 
 generateQr(){
