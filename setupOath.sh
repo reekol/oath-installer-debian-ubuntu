@@ -1,8 +1,6 @@
 #!/bin/bash
 
-
-apt-get install libpam-oath oathtool qrencode 2>&1 > /dev/null
-
+version='0.0.4'
 me=$(whoami)
 host=$(hostname)
 seed=$(head -10 /dev/urandom | sha512sum | cut -b 1-30)
@@ -15,7 +13,52 @@ sshdConfig="/etc/ssh/sshd_config"
 sshdPam="/etc/pam.d/sshd"
 typeLower=$(echo $type | tr '[:upper:]' '[:lower:]')
 
+pause(){ read -p $'\e[33mEnter to continue\e[0m' -n 1 -r; }
 
+version() { echo $version 1>&2; exit 0; }
+
+### START MENU SECTION ####
+
+TEMP=`getopt -o u:s:w:l:v --long user:,seed:,window:,length:,version,help -n '$0' -- "$@"`
+eval set -- "$TEMP"
+
+usage() {   echo -e "Usage: \n\
+        -u --user       User.\n\
+        -s --seed       Seed.\n\
+        -w --window     Algorithm window size.\n\
+        -l --length     Length of the pin.\n\
+        -h --help       Usage: Prints this help.\n\
+        -v --version    Prints version.\n\
+" 1>&2; exit 1; }
+
+while true ; do
+    case "$1" in
+        -u|--user)           me=$2;     shift 2;;
+        -s|--seed)           seed=$2;   shift 2;;
+        -w|--window)         window=$2; shift 2;;
+        -l|--length)         pinLen=$2; shift 2;;
+        -v|--version)        version;   shift 2;;
+        -h|--help)           usage;     shift  ;;
+        --)                             break  ;;
+        *) echo "Wrong arguments!" ;    exit 1 ;;
+    esac
+done
+
+echo -e  "\e[33mCurrent configuration: \n\
+        -u --user       $me\n\
+        -s --seed       $seed\n\
+        -w --window     $window\n\
+        -l --length     $pinLen\n\
+        -v --version    $version\n\
+          \e[0m"
+
+### END MENU SECTION ####
+
+pause
+
+installDep(){
+    apt-get install libpam-oath oathtool qrencode 2>&1 > /dev/null
+}
 
 setSeed(){
 #    echo -e "\n$type/T$window/$pinLen $1  -   $2" > $cnf
@@ -27,9 +70,8 @@ setSeed(){
 
 setSshdConfig(){
     local now=$(date +%Y-%m-%d-%H-%M-%s)
-    read -p $'\e[33mReconfigure $sshdConfig [Y/N]?\e[0m' -n 1 -r REPLY
+    read -p $'\e[33mReconfigure '${sshdConfig}$' [Y/N]?\e[0m' -n 1 -r REPLY
     echo
-    echo "[$REPLY]"
     if [[  $REPLY =~ ^[Yy]$ ]]
     then
         cp --verbose $sshdConfig $sshdConfig.$now.bak
@@ -52,9 +94,8 @@ setSshdAuth(){
         echo -e "\e[31mpam_oath found in $sshdPam\n Replacing\e[0m"
         sed -i "s/.*pam_oath.*/auth\ $authType\ pam_oath\.so\ usersfile\=$cnfEscaped\ window\=$window\ digits\=$pinLen/g"  $sshdPam
     else
-        read -p $'\e[33mAdd pam_oath to $sshdPam [Y/N]?\e[0m' -n 1 -r REPLY
+        read -p $'\e[33mAdd pam_oath to '${sshdPam}$' [Y/N]?\e[0m' -n 1 -r REPLY
         echo
-        echo "[$REPLY]"
         if [[  $REPLY =~ ^[Yy]$ ]]
         then
 #            echo -e "auth $authType pam_oath.so usersfile=$cnf\n\n$(cat $sshdPam)" > $sshdPam
@@ -67,7 +108,7 @@ setSshdAuth(){
 generateQr(){
     echo -e "\e[107m"
     secret=$(oathtool --$typeLower -v $3 | grep Base32 | cut -d ' ' -f3)
-    qrencode -t ASCII "otpauth://$typeLower/$1@$2?secret=$secret" | sed $'s/#/\e[40m \e[0m\e[107m/g'
+    qrencode -t ASCII "otpauth://$typeLower/$1@$2?secret=$secret" | sed $'s/#/\e[42m \e[0m\e[107m/g'
     echo -e "\e[0m"
     echo -e "Navigate to your Favorite Mobile OS's store and download FreeOTP app to scan qr code and start using OneTime authentication"
     echo -e "Or use this tool [NOT RECOMMENDED- Seed provided]: oathtool --totp -v $3 "
@@ -78,10 +119,7 @@ getOtp(){
     echo -e "[ Current pin: \e[32m$pin\e[0m ]% oathtool -v -s$window --$typeLower -d6 $seed" && echo ""
 }
 
-pause(){
-    read -p $'\e[33mEnter to continue\e[0m' -n 1 -r
-}
-
+installDep
 setSeed $me $seed && pause
 setSshdConfig && pause
 setSshdAuth && pause
