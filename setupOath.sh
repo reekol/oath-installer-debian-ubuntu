@@ -100,7 +100,6 @@ setSshdAuth(){
         echo
         if [[  $REPLY =~ ^[Yy]$ ]]
         then
-#            echo -e "auth $authType pam_oath.so usersfile=$cnf\n\n$(cat $sshdPam)" > $sshdPam
             echo -e "auth $authType pam_oath.so usersfile=$cnf window=$window digits=$pinLen\n\n$(cat $sshdPam)" > $sshdPam
         fi
     fi
