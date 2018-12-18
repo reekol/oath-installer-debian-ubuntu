@@ -59,7 +59,7 @@ pause
 installDep(){
     if [ $(dpkg -l | grep libpam-oath | wc -l ) -eq "0" ]; then apt-get install libpam-oath; fi
     if [ $(dpkg -l | grep oathtool    | wc -l ) -eq "0" ]; then apt-get install oathtool   ; fi
-    if [ $(dpkg -l | grep qrencode    | wc -l ) -eq "0" ]; then apt-get install qrencode   ; fi
+    if [ $(dpkg -l | grep -v libqrencode | grep qrencode    | wc -l ) -eq "0" ]; then apt-get install qrencode   ; fi
 }
 
 setSeed(){
